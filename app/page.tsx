@@ -10,6 +10,7 @@ import { ProcessorPanel } from './components/ProcessorPanel'
 import { useWebRTCStream } from './hooks/useWebRTCStream'
 import { useEventStream } from './hooks/useEventStream'
 import { useCanvasOverlay } from './hooks/useCanvasOverlay'
+import { SightGridDemo } from './components/SightGridDemo'
 
 type RightPanelTab = 'events' | 'processors'
 type AuthMode = 'access_token' | 'refresh_token' | null
@@ -107,8 +108,9 @@ export default function Dashboard() {
 
       {/* Main content */}
       <div className="flex-1 flex min-h-0">
+        {isSimpleMode && <SightGridDemo />}
         {/* Video section — full width in simple mode, 60% in full mode */}
-        <div className={`${isSimpleMode ? 'w-full' : 'w-[60%]'} p-4 flex flex-col`}>
+        <div className={`${isSimpleMode ? 'flex-1' : 'w-[60%]'} p-4 flex flex-col`}>
           <div className="relative flex-1 bg-black rounded-xl overflow-hidden">
             <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-contain" />
             <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
