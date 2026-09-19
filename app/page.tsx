@@ -55,6 +55,8 @@ export default function Dashboard() {
   
   const [activeZones, setActiveZones] =
     useState<string[]>([])
+  const [doorOpen, setDoorOpen] =
+    useState(false)
 
   useEffect(() => {
     fetch('/api/ring/config')
@@ -345,12 +347,26 @@ export default function Dashboard() {
                   </div>
 
                   <div>
-                    <p className="text-2xl font-light text-slate-300">
-                      CLOSED
+                    <p
+                      className={`text-2xl font-light ${
+                        doorOpen
+                          ? 'text-purple-300'
+                          : 'text-slate-300'
+                      }`}
+                    >
+                      {doorOpen ? 'OPEN' : 'CLOSED'}
                     </p>
 
-                    <p className="text-[10px] text-slate-500 mt-1">
-                      Virtual sensor · monitoring
+                    <p
+                      className={`text-[10px] mt-1 ${
+                        doorOpen
+                          ? 'text-purple-400'
+                          : 'text-slate-500'
+                      }`}
+                    >
+                      {doorOpen
+                        ? 'Door state correlated with active incident'
+                        : 'Virtual sensor · monitoring'}
                     </p>
                   </div>
                 </div>
@@ -379,22 +395,41 @@ export default function Dashboard() {
                 <TopologyNode
                   label="North Gate"
                   ring
+                  active={activeZones.includes('north-gate')}
                 />
 
-                <TopologyEdge />
+                <TopologyEdge
+                  active={
+                    activeZones.includes('north-gate') &&
+                    activeZones.includes('courtyard')
+                  }
+                />
 
                 <TopologyNode
                   label="Courtyard"
+                  active={activeZones.includes('courtyard')}
                 />
 
                 <div className="relative">
-                  <TopologyEdge />
+                  <TopologyEdge
+                    active={
+                      activeZones.includes('courtyard') &&
+                      activeZones.includes('block-a')
+                    }
+                  />
 
-                  <div className="absolute left-1/2 top-full h-7 border-l border-slate-600" />
+                  <div
+                    className={`absolute left-1/2 top-full h-7 border-l transition-all duration-500 ${
+                      activeZones.includes('block-b')
+                        ? 'border-cyan-400'
+                        : 'border-slate-600'
+                    }`}
+                  />
                 </div>
 
                 <TopologyNode
                   label="Block A"
+                  active={activeZones.includes('block-a')}
                 />
               </div>
 
@@ -403,6 +438,7 @@ export default function Dashboard() {
                   <TopologyNode
                     label="Block B"
                     small
+                    active={activeZones.includes('block-b')}
                   />
                 </div>
               </div>
@@ -411,6 +447,7 @@ export default function Dashboard() {
           <SightGridDemo
             ringEvents={events}
             onActiveZonesChange={setActiveZones}
+            onDoorStateChange={setDoorOpen}
           />
         </div>
       ) : (
@@ -651,20 +688,24 @@ function TopologyNode({
   label,
   ring = false,
   small = false,
+  active = false,
 }: {
   label: string
   ring?: boolean
   small?: boolean
+  active?: boolean
 }) {
   return (
     <div
-      className={`relative z-10 rounded-lg border px-4 py-2 text-center ${
-        ring
-          ? 'border-green-800 bg-green-950/30'
-          : 'border-slate-700 bg-dash-card'
+      className={`relative z-10 rounded-lg border px-4 py-2 text-center transition-all duration-500 ${
+        active
+          ? 'border-cyan-500 bg-cyan-950/50 shadow-[0_0_18px_rgba(34,211,238,0.18)]'
+          : ring
+            ? 'border-green-800 bg-green-950/30'
+            : 'border-slate-700 bg-dash-card'
       } ${small ? 'text-[10px]' : 'text-xs'}`}
     >
-      <p className="text-slate-200">
+      <p className={active ? 'text-cyan-200' : 'text-slate-200'}>
         {label}
       </p>
 
@@ -673,14 +714,36 @@ function TopologyNode({
           RING
         </p>
       )}
+
+      {active && !ring && (
+        <p className="text-[8px] text-cyan-400 mt-0.5">
+          ACTIVE
+        </p>
+      )}
     </div>
   )
 }
 
-function TopologyEdge() {
+function TopologyEdge({
+  active = false,
+}: {
+  active?: boolean
+}) {
   return (
-    <div className="w-16 border-t border-slate-600 relative">
-      <div className="absolute right-0 -top-[3px] w-1.5 h-1.5 rounded-full bg-slate-600" />
+    <div
+      className={`w-16 border-t relative transition-all duration-500 ${
+        active
+          ? 'border-cyan-400'
+          : 'border-slate-600'
+      }`}
+    >
+      <div
+        className={`absolute right-0 -top-[3px] w-1.5 h-1.5 rounded-full ${
+          active
+            ? 'bg-cyan-400'
+            : 'bg-slate-600'
+        }`}
+      />
     </div>
   )
 }

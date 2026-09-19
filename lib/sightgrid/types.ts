@@ -15,6 +15,11 @@ export type ObservationClass =
   | 'environment'
   | 'unknown'
 
+export type SensorKind =
+  | 'camera'
+  | 'contact_sensor'
+  | 'environmental_sensor'
+
 export interface SightGridZone {
   id: string
   name: string
@@ -29,10 +34,9 @@ export interface SightGridEvent {
   zoneId: string
   type: SightGridEventType
   timestamp: string
-
+  sensorKind?: SensorKind
   observationClass?: ObservationClass
   observationConfidence?: number
-
   metadata?: Record<string, unknown>
 }
 
@@ -62,7 +66,6 @@ export interface SightGridIncident {
   status: IncidentStatus
   events: SightGridEvent[]
   path: string[]
-
   correlationConfidence: number
   correlationHistory: CorrelationResult[]
 }

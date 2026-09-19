@@ -319,3 +319,12 @@ export function createIncident(
     correlationHistory: [],
   }
 }
+export function resolveIncident(
+  incident: SightGridIncident
+): SightGridIncident {
+  return {
+    ...incident,
+    status: 'resolved',
+    updatedAt: new Date().toISOString(),
+  }
+}
