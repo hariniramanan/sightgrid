@@ -52,6 +52,9 @@ export default function Dashboard() {
 
   const canvasRef =
     useRef<HTMLCanvasElement>(null)
+  
+  const [activeZones, setActiveZones] =
+    useState<string[]>([])
 
   useEffect(() => {
     fetch('/api/ring/config')
@@ -301,20 +304,20 @@ export default function Dashboard() {
                   </>
                 )}
               </section>
-
-              {/* Courtyard */}
+              
               <VirtualCamera
                 zone="Courtyard"
                 device="Camera 02"
                 detail="Adjacent to North Gate"
+                active={activeZones.includes('courtyard')}
               />
 
-              {/* Block A */}
               <VirtualCamera
                 zone="Block A"
                 device="Camera 03"
                 detail="East building entrance"
-              />
+                active={activeZones.includes('block-a')}
+                />
 
               {/* Door sensor */}
               <section className="relative min-h-[190px] rounded-xl border border-slate-700 bg-dash-card overflow-hidden">
@@ -405,10 +408,9 @@ export default function Dashboard() {
               </div>
             </section>
           </main>
-
-          {/* Incident intelligence */}
           <SightGridDemo
             ringEvents={events}
+            onActiveZonesChange={setActiveZones}
           />
         </div>
       ) : (
@@ -546,22 +548,58 @@ function VirtualCamera({
   zone,
   device,
   detail,
+  active = false,
 }: {
   zone: string
   device: string
   detail: string
+  active?: boolean
 }) {
   return (
-    <section className="relative min-h-[190px] rounded-xl border border-slate-700 bg-dash-card overflow-hidden">
+    <section
+      className={`relative min-h-[190px] rounded-xl overflow-hidden transition-all duration-500 ${
+        active
+          ? 'border border-cyan-500 bg-cyan-950/20 shadow-[0_0_24px_rgba(34,211,238,0.12)]'
+          : 'border border-slate-700 bg-dash-card'
+      }`}
+    >
+      {active && (
+        <div className="absolute inset-0 border border-cyan-400/30 rounded-xl pointer-events-none" />
+      )}
+
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="relative">
-          <div className="w-28 h-20 border border-slate-700 rounded-lg bg-slate-900/60 flex items-center justify-center">
-            <div className="w-9 h-9 rounded-full border border-slate-600 flex items-center justify-center">
-              <div className="w-3 h-3 rounded-full bg-slate-700" />
+          <div
+            className={`w-28 h-20 border rounded-lg flex items-center justify-center transition-all duration-500 ${
+              active
+                ? 'border-cyan-700 bg-cyan-950/40'
+                : 'border-slate-700 bg-slate-900/60'
+            }`}
+          >
+            <div
+              className={`w-9 h-9 rounded-full border flex items-center justify-center ${
+                active
+                  ? 'border-cyan-500'
+                  : 'border-slate-600'
+              }`}
+            >
+              <div
+                className={`w-3 h-3 rounded-full ${
+                  active
+                    ? 'bg-cyan-400 animate-pulse'
+                    : 'bg-slate-700'
+                }`}
+              />
             </div>
           </div>
 
-          <div className="w-8 h-3 border-x border-b border-slate-700 mx-auto" />
+          <div
+            className={`w-8 h-3 border-x border-b mx-auto ${
+              active
+                ? 'border-cyan-700'
+                : 'border-slate-700'
+            }`}
+          />
         </div>
       </div>
 
@@ -583,19 +621,32 @@ function VirtualCamera({
         </div>
 
         <div>
-          <p className="text-[10px] uppercase tracking-wider text-slate-400">
-            ● Monitoring
-          </p>
+          {active ? (
+            <>
+              <p className="text-[10px] uppercase tracking-wider text-cyan-300">
+                ● Motion observed
+              </p>
 
-          <p className="text-[10px] text-slate-600 mt-1">
-            {detail}
-          </p>
+              <p className="text-[10px] text-cyan-700 mt-1">
+                Correlated with active incident
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-[10px] uppercase tracking-wider text-slate-400">
+                ● Monitoring
+              </p>
+
+              <p className="text-[10px] text-slate-600 mt-1">
+                {detail}
+              </p>
+            </>
+          )}
         </div>
       </div>
     </section>
   )
 }
-
 function TopologyNode({
   label,
   ring = false,

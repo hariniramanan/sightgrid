@@ -14,10 +14,12 @@ const wait = (ms: number) =>
 
 interface SightGridDemoProps {
   ringEvents: DetectionEvent[]
+  onActiveZonesChange?: (zones: string[]) => void
 }
 
 export function SightGridDemo({
   ringEvents,
+  onActiveZonesChange,
 }: SightGridDemoProps) {
   const [incident, setIncident] =
     useState<SightGridIncident | null>(null)
@@ -64,6 +66,16 @@ export function SightGridDemo({
     return 'text-amber-400'
   }
 
+  const publishIncident = (
+    nextIncident: SightGridIncident
+  ) => {
+    setIncident(nextIncident)
+
+    onActiveZonesChange?.(
+      Array.from(new Set(nextIncident.path))
+    )
+  }
+
   useEffect(() => {
     const latestEvent = normalizedRingEvents[0]
 
@@ -76,13 +88,17 @@ export function SightGridDemo({
     }
 
     processedEventIds.current.add(latestEvent.id)
-    setIncident(createIncident(latestEvent))
+
+    publishIncident(
+      createIncident(latestEvent)
+    )
   }, [ringEvents])
 
   const runDemo = async () => {
     if (running) return
 
     setRunning(true)
+    onActiveZonesChange?.([])
 
     const start = Date.now()
 
@@ -108,7 +124,7 @@ export function SightGridDemo({
       current = createIncident(northGate)
     }
 
-    setIncident(current)
+    publishIncident(current)
 
     const firstTimestamp = new Date(
       current.events[0].timestamp
@@ -147,7 +163,7 @@ export function SightGridDemo({
 
     if (second) {
       current = second
-      setIncident(current)
+      publishIncident(current)
     }
 
     await wait(1200)
@@ -159,7 +175,7 @@ export function SightGridDemo({
 
     if (third) {
       current = third
-      setIncident(current)
+      publishIncident(current)
     }
 
     setRunning(false)
