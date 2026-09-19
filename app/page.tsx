@@ -108,7 +108,9 @@ export default function Dashboard() {
 
       {/* Main content */}
       <div className="flex-1 flex min-h-0">
-        {isSimpleMode && <SightGridDemo />}
+        {isSimpleMode && (
+          <SightGridDemo ringEvents={events} />
+        )}
         {/* Video section — full width in simple mode, 60% in full mode */}
         <div className={`${isSimpleMode ? 'flex-1' : 'w-[60%]'} p-4 flex flex-col`}>
           <div className="relative flex-1 bg-black rounded-xl overflow-hidden">

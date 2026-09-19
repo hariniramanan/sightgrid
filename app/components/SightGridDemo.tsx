@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { DetectionEvent } from './EventCard'
+import { normalizeRingEvent } from '@/lib/sightgrid/ringAdapter'
 import { SightGridEvent, SightGridIncident } from '@/lib/sightgrid/types'
 import {
   addEventToIncident,
@@ -10,7 +12,13 @@ import {
 const wait = (ms: number) =>
   new Promise(resolve => setTimeout(resolve, ms))
 
-export function SightGridDemo() {
+interface SightGridDemoProps {
+  ringEvents: DetectionEvent[]
+}
+
+export function SightGridDemo({
+  ringEvents,
+}: SightGridDemoProps) {
   const [incident, setIncident] =
     useState<SightGridIncident | null>(null)
 
@@ -89,8 +97,15 @@ export function SightGridDemo() {
     return names[zoneId] ?? zoneId
   }
 
+  // Convert genuine Ring webhook events into SightGrid events.
+  const normalizedRingEvents = ringEvents
+    .map(normalizeRingEvent)
+    .filter((event): event is SightGridEvent => event !== null)
+
   return (
     <div className="w-[380px] border-l border-slate-700 bg-dash-panel p-4 overflow-y-auto">
+
+      {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
           <p className="text-xs uppercase tracking-widest text-dash-cyan">
@@ -107,6 +122,53 @@ export function SightGridDemo() {
         </span>
       </div>
 
+      {/* Genuine Ring event feed */}
+      <div className="mb-4 rounded-lg border border-slate-700 bg-dash-card p-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium text-white">
+            Ring Event Feed
+          </span>
+
+          <span className="rounded bg-green-900 px-2 py-1 text-[10px] text-green-300">
+            REAL RING
+          </span>
+        </div>
+
+        {normalizedRingEvents.length === 0 ? (
+          <p className="mt-2 text-xs text-slate-400">
+            Waiting for Ring webhook events...
+          </p>
+        ) : (
+          <div className="mt-3 space-y-2">
+            {normalizedRingEvents.slice(0, 3).map((event) => (
+              <div
+                key={event.id}
+                className="rounded border border-slate-700 p-2"
+              >
+                <div className="flex justify-between">
+                  <span className="text-xs text-dash-cyan">
+                    {event.type}
+                  </span>
+
+                  <span className="text-[10px] text-slate-500">
+                    {new Date(event.timestamp).toLocaleTimeString()}
+                  </span>
+                </div>
+
+                <p className="mt-1 text-xs text-slate-400">
+                  {event.deviceName}
+                </p>
+
+                <p className="mt-1 text-[10px] uppercase text-green-400">
+                  Ring webhook
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Simulated multi-zone demo */}
       <button
         onClick={runDemo}
         disabled={running}
@@ -129,6 +191,8 @@ export function SightGridDemo() {
 
       {incident && (
         <div className="mt-5">
+
+          {/* Incident status */}
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-400">
               ACTIVE INCIDENT
@@ -147,10 +211,13 @@ export function SightGridDemo() {
             </span>
           </div>
 
+          {/* Incident events */}
           <div className="mt-4 space-y-1">
             {incident.events.map((event, index) => (
               <div key={event.id}>
+
                 <div className="bg-dash-card rounded-lg p-3">
+
                   <div className="flex justify-between">
                     <span className="text-sm font-medium text-white">
                       {zoneName(event.zoneId)}
@@ -174,6 +241,7 @@ export function SightGridDemo() {
                   <p className="text-xs text-dash-cyan mt-2">
                     Motion observed
                   </p>
+
                 </div>
 
                 {index < incident.events.length - 1 && (
@@ -181,12 +249,15 @@ export function SightGridDemo() {
                     ↓
                   </div>
                 )}
+
               </div>
             ))}
           </div>
 
+          {/* Correlated path */}
           {incident.events.length > 1 && (
             <div className="mt-4 border border-dash-cyan/30 bg-cyan-950/20 rounded-lg p-3">
+
               <p className="text-xs text-dash-cyan font-medium">
                 CORRELATED SEQUENCE
               </p>
@@ -199,10 +270,13 @@ export function SightGridDemo() {
                 {incident.events.length} observations correlated using
                 time and spatial adjacency.
               </p>
+
             </div>
           )}
+
         </div>
       )}
+
     </div>
   )
 }
