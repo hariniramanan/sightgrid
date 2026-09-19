@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { DetectionEvent } from './EventCard'
 import { normalizeRingEvent } from '@/lib/sightgrid/ringAdapter'
 import { SightGridEvent, SightGridIncident } from '@/lib/sightgrid/types'
@@ -24,67 +24,11 @@ export function SightGridDemo({
 
   const [running, setRunning] = useState(false)
 
-  const runDemo = async () => {
-    if (running) return
+  const processedEventIds = useRef<Set<string>>(new Set())
 
-    setRunning(true)
-    setIncident(null)
-
-    const start = Date.now()
-
-    const events: SightGridEvent[] = [
-      {
-        id: 'demo-1',
-        source: 'simulated',
-        deviceId: 'camera-north',
-        deviceName: 'Camera 01',
-        zoneId: 'north-gate',
-        type: 'motion',
-        timestamp: new Date(start).toISOString(),
-      },
-      {
-        id: 'demo-2',
-        source: 'simulated',
-        deviceId: 'camera-courtyard',
-        deviceName: 'Camera 02',
-        zoneId: 'courtyard',
-        type: 'motion',
-        timestamp: new Date(start + 12_000).toISOString(),
-      },
-      {
-        id: 'demo-3',
-        source: 'simulated',
-        deviceId: 'camera-block-a',
-        deviceName: 'Camera 03',
-        zoneId: 'block-a',
-        type: 'motion',
-        timestamp: new Date(start + 21_000).toISOString(),
-      },
-    ]
-
-    let current = createIncident(events[0])
-    setIncident(current)
-
-    await wait(1200)
-
-    const second = addEventToIncident(current, events[1])
-
-    if (second) {
-      current = second
-      setIncident(current)
-    }
-
-    await wait(1200)
-
-    const third = addEventToIncident(current, events[2])
-
-    if (third) {
-      current = third
-      setIncident(current)
-    }
-
-    setRunning(false)
-  }
+  const normalizedRingEvents = ringEvents
+    .map(normalizeRingEvent)
+    .filter((event): event is SightGridEvent => event !== null)
 
   const zoneName = (zoneId: string) => {
     const names: Record<string, string> = {
@@ -97,10 +41,132 @@ export function SightGridDemo({
     return names[zoneId] ?? zoneId
   }
 
-  // Convert genuine Ring webhook events into SightGrid events.
-  const normalizedRingEvents = ringEvents
-    .map(normalizeRingEvent)
-    .filter((event): event is SightGridEvent => event !== null)
+  /*
+   * When a Ring/test webhook arrives, make it the beginning
+   * of a SightGrid incident.
+   */
+  useEffect(() => {
+    const latestEvent = normalizedRingEvents[0]
+
+    if (!latestEvent) return
+
+    if (processedEventIds.current.has(latestEvent.id)) {
+      return
+    }
+
+    processedEventIds.current.add(latestEvent.id)
+
+    setIncident(createIncident(latestEvent))
+  }, [ringEvents])
+
+  /*
+   * Demonstrates additional cameras observing activity after
+   * the first event.
+   *
+   * If a webhook event already exists, it becomes observation #1.
+   * Otherwise we create a completely simulated North Gate event.
+   */
+  const runDemo = async () => {
+    if (running) return
+
+    setRunning(true)
+
+    const start = Date.now()
+
+    let current: SightGridIncident
+
+    const latestRingEvent = normalizedRingEvents[0]
+
+    if (latestRingEvent) {
+      current = createIncident(latestRingEvent)
+    } else {
+      const northGateEvent: SightGridEvent = {
+        id: `demo-north-${start}`,
+        source: 'simulated',
+        deviceId: 'camera-north',
+        deviceName: 'Camera 01',
+        zoneId: 'north-gate',
+        type: 'motion',
+        timestamp: new Date(start).toISOString(),
+      }
+
+      current = createIncident(northGateEvent)
+    }
+
+    setIncident(current)
+
+    /*
+     * Use timestamps relative to the first observation so the
+     * correlation engine evaluates the sequence as one incident.
+     */
+    const firstTimestamp =
+      new Date(current.events[0].timestamp).getTime()
+
+    const courtyardEvent: SightGridEvent = {
+      id: `demo-courtyard-${start}`,
+      source: 'simulated',
+      deviceId: 'camera-courtyard',
+      deviceName: 'Camera 02',
+      zoneId: 'courtyard',
+      type: 'motion',
+      timestamp: new Date(firstTimestamp + 12_000).toISOString(),
+    }
+
+    const blockAEvent: SightGridEvent = {
+      id: `demo-block-a-${start}`,
+      source: 'simulated',
+      deviceId: 'camera-block-a',
+      deviceName: 'Camera 03',
+      zoneId: 'block-a',
+      type: 'motion',
+      timestamp: new Date(firstTimestamp + 21_000).toISOString(),
+    }
+
+    await wait(1200)
+
+    const second =
+      addEventToIncident(current, courtyardEvent)
+
+    if (second) {
+      current = second
+      setIncident(current)
+    }
+
+    await wait(1200)
+
+    const third =
+      addEventToIncident(current, blockAEvent)
+
+    if (third) {
+      current = third
+      setIncident(current)
+    }
+
+    setRunning(false)
+  }
+
+  const sourceLabel = (event: SightGridEvent) => {
+    if (event.source === 'ring') {
+      return 'REAL RING'
+    }
+
+    const simulatedWebhook =
+      event.metadata?.simulated === true
+
+    if (simulatedWebhook) {
+      return 'SIMULATED WEBHOOK'
+    }
+
+    return 'SIMULATED CAMERA'
+  }
+
+  const sourceClass = (event: SightGridEvent) => {
+    if (event.source === 'ring') {
+      return 'text-green-400'
+    }
+
+    return 'text-amber-400'
+  }
 
   return (
     <div className="w-[380px] border-l border-slate-700 bg-dash-panel p-4 overflow-y-auto">
@@ -122,16 +188,17 @@ export function SightGridDemo({
         </span>
       </div>
 
-      {/* Genuine Ring event feed */}
+      {/* Webhook feed */}
       <div className="mb-4 rounded-lg border border-slate-700 bg-dash-card p-3">
+
         <div className="flex items-center justify-between">
           <span className="text-xs font-medium text-white">
             Ring Event Feed
           </span>
 
-        <span className="rounded bg-slate-700 px-2 py-1 text-[10px] text-slate-300">
+          <span className="rounded bg-slate-700 px-2 py-1 text-[10px] text-slate-300">
             WEBHOOK FEED
-        </span>
+          </span>
         </div>
 
         {normalizedRingEvents.length === 0 ? (
@@ -140,60 +207,72 @@ export function SightGridDemo({
           </p>
         ) : (
           <div className="mt-3 space-y-2">
-            {normalizedRingEvents.slice(0, 3).map((event) => (
-              <div
-                key={event.id}
-                className="rounded border border-slate-700 p-2"
-              >
-                <div className="flex justify-between">
-                  <span className="text-xs text-dash-cyan">
-                    {event.type}
-                  </span>
 
-                  <span className="text-[10px] text-slate-500">
-                    {new Date(event.timestamp).toLocaleTimeString()}
-                  </span>
-                </div>
-
-                <p className="mt-1 text-xs text-slate-400">
-                  {event.deviceName}
-                </p>
-
-                <p
-                    className={`mt-1 text-[10px] uppercase ${
-                        event.source === 'ring'
-                            ? 'text-green-400'
-                            : 'text-amber-400'
-                    }`}
+            {normalizedRingEvents
+              .slice(0, 3)
+              .map(event => (
+                <div
+                  key={event.id}
+                  className="rounded border border-slate-700 p-2"
                 >
-                    {event.source === 'ring'
-                        ? 'REAL RING'
-                        : 'SIMULATED WEBHOOK'}
-                </p>
-              </div>
-            ))}
+                  <div className="flex justify-between">
+
+                    <span className="text-xs text-dash-cyan">
+                      {event.type}
+                    </span>
+
+                    <span className="text-[10px] text-slate-500">
+                      {new Date(
+                        event.timestamp
+                      ).toLocaleTimeString()}
+                    </span>
+
+                  </div>
+
+                  <p className="mt-1 text-xs text-slate-400">
+                    {event.deviceName}
+                  </p>
+
+                  <p
+                    className={`mt-1 text-[10px] uppercase ${sourceClass(
+                      event
+                    )}`}
+                  >
+                    {sourceLabel(event)}
+                  </p>
+
+                </div>
+              ))}
+
           </div>
         )}
+
       </div>
 
-      {/* Simulated multi-zone demo */}
+      {/* Demo action */}
       <button
         onClick={runDemo}
         disabled={running}
         className="w-full bg-dash-cyan text-black font-bold py-2 rounded-lg hover:bg-cyan-300 disabled:opacity-50"
       >
-        {running ? 'Correlating Events...' : 'Run Demo Incident'}
+        {running
+          ? 'Correlating Events...'
+          : normalizedRingEvents.length > 0
+            ? 'Continue Across Site'
+            : 'Run Demo Incident'}
       </button>
 
       {!incident && (
         <div className="mt-6 border border-dashed border-slate-600 rounded-lg p-5 text-center">
+
           <p className="text-sm text-slate-400">
             No active incident
           </p>
 
           <p className="text-xs text-slate-500 mt-1">
-            Run the demo to simulate activity across multiple zones.
+            Generate a webhook event or run the demo to begin.
           </p>
+
         </div>
       )}
 
@@ -202,6 +281,7 @@ export function SightGridDemo({
 
           {/* Incident status */}
           <div className="flex items-center justify-between">
+
             <span className="text-xs text-slate-400">
               ACTIVE INCIDENT
             </span>
@@ -217,33 +297,45 @@ export function SightGridDemo({
                 .replaceAll('_', ' ')
                 .toUpperCase()}
             </span>
+
           </div>
 
-          {/* Incident events */}
+          {/* Incident timeline */}
           <div className="mt-4 space-y-1">
+
             {incident.events.map((event, index) => (
               <div key={event.id}>
 
                 <div className="bg-dash-card rounded-lg p-3">
 
                   <div className="flex justify-between">
+
                     <span className="text-sm font-medium text-white">
                       {zoneName(event.zoneId)}
                     </span>
 
                     <span className="text-xs text-slate-400">
-                      {new Date(event.timestamp).toLocaleTimeString()}
+                      {new Date(
+                        event.timestamp
+                      ).toLocaleTimeString()}
                     </span>
+
                   </div>
 
                   <div className="flex justify-between mt-1">
+
                     <span className="text-xs text-slate-400">
                       {event.deviceName}
                     </span>
 
-                    <span className="text-[10px] text-slate-500 uppercase">
-                      Simulated source
+                    <span
+                      className={`text-[10px] uppercase ${sourceClass(
+                        event
+                      )}`}
+                    >
+                      {sourceLabel(event)}
                     </span>
+
                   </div>
 
                   <p className="text-xs text-dash-cyan mt-2">
@@ -252,7 +344,8 @@ export function SightGridDemo({
 
                 </div>
 
-                {index < incident.events.length - 1 && (
+                {index <
+                  incident.events.length - 1 && (
                   <div className="text-center text-slate-500 py-1">
                     ↓
                   </div>
@@ -260,9 +353,10 @@ export function SightGridDemo({
 
               </div>
             ))}
+
           </div>
 
-          {/* Correlated path */}
+          {/* Correlation explanation */}
           {incident.events.length > 1 && (
             <div className="mt-4 border border-dash-cyan/30 bg-cyan-950/20 rounded-lg p-3">
 
@@ -271,12 +365,14 @@ export function SightGridDemo({
               </p>
 
               <p className="text-sm text-white mt-2">
-                {incident.path.map(zoneName).join(' → ')}
+                {incident.path
+                  .map(zoneName)
+                  .join(' → ')}
               </p>
 
               <p className="text-xs text-slate-400 mt-2">
-                {incident.events.length} observations correlated using
-                time and spatial adjacency.
+                {incident.events.length} observations correlated
+                using time and spatial adjacency.
               </p>
 
             </div>

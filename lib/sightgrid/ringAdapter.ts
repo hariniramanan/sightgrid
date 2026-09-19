@@ -7,7 +7,7 @@ interface RingDeviceMapping {
 }
 
 const ringDeviceMap: Record<string, RingDeviceMapping> = {
-  // Real device mappings will be registered here.
+  // Real Ring device → SightGrid zone mappings will go here.
 }
 
 function mapEventType(
@@ -26,6 +26,24 @@ function mapEventType(
   }
 }
 
+export function isSimulatedRingEvent(
+  event: DetectionEvent
+): boolean {
+  if (event.metadata?.simulated === true) {
+    return true
+  }
+
+  // The local webhook test endpoint uses generated test device IDs.
+  if (
+    event.device_id === 'test-device-123' ||
+    event.device_id?.startsWith('test-')
+  ) {
+    return true
+  }
+
+  return false
+}
+
 export function normalizeRingEvent(
   event: DetectionEvent
 ): SightGridEvent | null {
@@ -39,9 +57,15 @@ export function normalizeRingEvent(
 
   return {
     id: event.event_id,
-    source: 'ring',
+    source: isSimulatedRingEvent(event)
+      ? 'simulated'
+      : 'ring',
     deviceId: event.device_id,
-    deviceName: mapping?.deviceName ?? 'Ring Device',
+    deviceName:
+      mapping?.deviceName ??
+      (isSimulatedRingEvent(event)
+        ? 'Test Ring Device'
+        : 'Ring Device'),
     zoneId: mapping?.zoneId ?? 'north-gate',
     type,
     timestamp: event.timestamp,
@@ -49,6 +73,7 @@ export function normalizeRingEvent(
       confidence: event.confidence,
       boundingBox: event.bounding_box,
       originalEventType: event.event_type,
+      simulated: isSimulatedRingEvent(event),
     },
   }
 }
