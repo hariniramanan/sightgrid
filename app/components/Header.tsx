@@ -12,60 +12,59 @@ export function Header({
   simpleMode,
 }: HeaderProps) {
   return (
-    <header className="h-[68px] bg-dash-panel border-b border-slate-700 px-5 flex items-center justify-between shrink-0">
-      <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-lg border border-cyan-500/30 bg-cyan-950/30 flex items-center justify-center text-dash-cyan text-xl">
-          ◈
-        </div>
-
+    <header className="h-[70px] bg-[#F4F1EE] border-b border-[#D5D0CB] px-6 flex items-center justify-between shrink-0 text-[#011D4D]">
+      <div className="flex items-center gap-4">
         <div>
+          <p className="text-[10px] uppercase tracking-[0.14em] text-[#6F747B]">
+            Site
+          </p>
+
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-bold text-white tracking-wide">
-              SightGrid
+            <h1 className="text-[15px] font-semibold">
+              Ring Playground
             </h1>
 
-            <span className="text-[9px] px-2 py-0.5 rounded-full border border-cyan-700/50 bg-cyan-950/30 text-cyan-300 uppercase tracking-wider">
-              Prototype
+            <span className="text-[#034078] text-xs">
+              ▾
             </span>
           </div>
-
-          <p className="text-[10px] text-slate-400 tracking-[0.18em] uppercase">
-            Spatial Event Intelligence
-          </p>
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-7">
         {simpleMode ? (
-          <>
-            <span className="hidden sm:inline text-[10px] text-slate-500 uppercase tracking-wider">
-              Ring Playground
-            </span>
-
-            <span className="text-[10px] px-2.5 py-1 rounded-full bg-green-950/60 border border-green-800/60 text-green-300">
-              ● RING API CONNECTED
-            </span>
-          </>
+          <div className="flex items-center gap-2 text-[12px] font-medium">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#1282A2]" />
+            Ring API Connected
+          </div>
         ) : (
           <>
-            <span
-              className={`text-xs px-2 py-1 rounded-full ${
-                connected
-                  ? 'bg-green-900 text-green-300'
-                  : 'bg-red-900 text-red-300'
-              }`}
-            >
-              {connected ? '● Connected' : '○ Disconnected'}
-            </span>
+            <div className="flex items-center gap-2 text-xs">
+              <span
+                className={`w-2.5 h-2.5 rounded-full ${
+                  connected
+                    ? 'bg-[#1282A2]'
+                    : 'bg-[#63372C]'
+                }`}
+              />
+
+              {connected
+                ? 'Connected'
+                : 'Disconnected'}
+            </div>
 
             {enabledCount > 0 && (
-              <span className="text-xs px-2 py-1 rounded-full bg-purple-900 text-purple-300">
+              <span className="text-xs text-[#63372C]">
                 {enabledCount} processor
                 {enabledCount > 1 ? 's' : ''} active
               </span>
             )}
           </>
         )}
+
+        <span className="hidden md:inline text-[11px] text-[#6F747B]">
+          SightGrid
+        </span>
       </div>
     </header>
   )
