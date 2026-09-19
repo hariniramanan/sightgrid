@@ -6,6 +6,7 @@ export interface DetectionEvent {
   event_id: string
   event_type: string
   timestamp: string
+  device_id: string | null
   confidence: number | null
   bounding_box: { x: number; y: number; width: number; height: number } | null
   thumbnail_url: string | null
