@@ -1,13 +1,22 @@
 import { DetectionEvent } from '@/app/components/EventCard'
-import { SightGridEvent, SightGridEventType } from './types'
+
+import {
+  ObservationClass,
+  SightGridEvent,
+  SightGridEventType,
+} from './types'
 
 interface RingDeviceMapping {
   zoneId: string
   deviceName: string
 }
 
-const ringDeviceMap: Record<string, RingDeviceMapping> = {
-  // Real Ring device → SightGrid zone mappings will go here.
+const ringDeviceMap: Record<
+  string,
+  RingDeviceMapping
+> = {
+  // Real Ring device → SightGrid zone mappings
+  // will go here.
 }
 
 function mapEventType(
@@ -26,16 +35,36 @@ function mapEventType(
   }
 }
 
+function mapObservationClass(
+  eventType: string
+): ObservationClass {
+  switch (eventType) {
+    case 'person_detected':
+      return 'person'
+
+    case 'motion_detected':
+      return 'motion'
+
+    case 'device_offline':
+      return 'unknown'
+
+    default:
+      return 'unknown'
+  }
+}
+
 export function isSimulatedRingEvent(
   event: DetectionEvent
 ): boolean {
-  if (event.metadata?.simulated === true) {
+  if (
+    event.metadata?.simulated === true
+  ) {
     return true
   }
 
-  // The local webhook test endpoint uses generated test device IDs.
   if (
-    event.device_id === 'test-device-123' ||
+    event.device_id ===
+      'test-device-123' ||
     event.device_id?.startsWith('test-')
   ) {
     return true
@@ -47,33 +76,62 @@ export function isSimulatedRingEvent(
 export function normalizeRingEvent(
   event: DetectionEvent
 ): SightGridEvent | null {
-  const type = mapEventType(event.event_type)
+  const type = mapEventType(
+    event.event_type
+  )
 
   if (!type || !event.device_id) {
     return null
   }
 
-  const mapping = ringDeviceMap[event.device_id]
+  const mapping =
+    ringDeviceMap[event.device_id]
+
+  const simulated =
+    isSimulatedRingEvent(event)
 
   return {
     id: event.event_id,
-    source: isSimulatedRingEvent(event)
+
+    source: simulated
       ? 'simulated'
       : 'ring',
+
     deviceId: event.device_id,
+
     deviceName:
       mapping?.deviceName ??
-      (isSimulatedRingEvent(event)
+      (simulated
         ? 'Test Ring Device'
         : 'Ring Device'),
-    zoneId: mapping?.zoneId ?? 'north-gate',
+
+    zoneId:
+      mapping?.zoneId ??
+      'north-gate',
+
     type,
+
     timestamp: event.timestamp,
+
+    observationClass:
+      mapObservationClass(
+        event.event_type
+      ),
+
+    observationConfidence:
+      event.confidence ?? undefined,
+
     metadata: {
-      confidence: event.confidence,
-      boundingBox: event.bounding_box,
-      originalEventType: event.event_type,
-      simulated: isSimulatedRingEvent(event),
+      confidence:
+        event.confidence,
+
+      boundingBox:
+        event.bounding_box,
+
+      originalEventType:
+        event.event_type,
+
+      simulated,
     },
   }
 }

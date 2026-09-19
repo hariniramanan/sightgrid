@@ -3,10 +3,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { DetectionEvent } from './EventCard'
 import { normalizeRingEvent } from '@/lib/sightgrid/ringAdapter'
-import { SightGridEvent, SightGridIncident } from '@/lib/sightgrid/types'
+
+import {
+  CorrelationResult,
+  SightGridEvent,
+  SightGridIncident,
+} from '@/lib/sightgrid/types'
+
 import {
   addEventToIncident,
   createIncident,
+  evaluateCorrelation,
 } from '@/lib/sightgrid/correlator'
 
 const wait = (ms: number) =>
@@ -17,6 +24,11 @@ interface SightGridDemoProps {
   onActiveZonesChange?: (zones: string[]) => void
 }
 
+interface RejectedObservation {
+  event: SightGridEvent
+  result: CorrelationResult
+}
+
 export function SightGridDemo({
   ringEvents,
   onActiveZonesChange,
@@ -24,9 +36,14 @@ export function SightGridDemo({
   const [incident, setIncident] =
     useState<SightGridIncident | null>(null)
 
-  const [running, setRunning] = useState(false)
+  const [running, setRunning] =
+    useState(false)
 
-  const processedEventIds = useRef<Set<string>>(new Set())
+  const [rejectedObservation, setRejectedObservation] =
+    useState<RejectedObservation | null>(null)
+
+  const processedEventIds =
+    useRef<Set<string>>(new Set())
 
   const normalizedRingEvents = ringEvents
     .map(normalizeRingEvent)
@@ -46,19 +63,25 @@ export function SightGridDemo({
     return names[zoneId] ?? zoneId
   }
 
-  const sourceLabel = (event: SightGridEvent) => {
+  const sourceLabel = (
+    event: SightGridEvent
+  ) => {
     if (event.source === 'ring') {
       return 'REAL RING'
     }
 
-    if (event.metadata?.simulated === true) {
+    if (
+      event.metadata?.simulated === true
+    ) {
       return 'SIMULATED WEBHOOK'
     }
 
     return 'SIMULATED DEVICE'
   }
 
-  const sourceClass = (event: SightGridEvent) => {
+  const sourceClass = (
+    event: SightGridEvent
+  ) => {
     if (event.source === 'ring') {
       return 'text-green-400'
     }
@@ -72,22 +95,31 @@ export function SightGridDemo({
     setIncident(nextIncident)
 
     onActiveZonesChange?.(
-      Array.from(new Set(nextIncident.path))
+      Array.from(
+        new Set(nextIncident.path)
+      )
     )
   }
 
   useEffect(() => {
-    const latestEvent = normalizedRingEvents[0]
+    const latestEvent =
+      normalizedRingEvents[0]
 
     if (!latestEvent) return
 
     if (
-      processedEventIds.current.has(latestEvent.id)
+      processedEventIds.current.has(
+        latestEvent.id
+      )
     ) {
       return
     }
 
-    processedEventIds.current.add(latestEvent.id)
+    processedEventIds.current.add(
+      latestEvent.id
+    )
+
+    setRejectedObservation(null)
 
     publishIncident(
       createIncident(latestEvent)
@@ -98,18 +130,22 @@ export function SightGridDemo({
     if (running) return
 
     setRunning(true)
+    setRejectedObservation(null)
+
     onActiveZonesChange?.([])
 
     const start = Date.now()
 
     let current: SightGridIncident
 
-    const latestEvent = normalizedRingEvents.find(
-      event => event.type === 'motion'
-    )
+    const latestEvent =
+      normalizedRingEvents.find(
+        event => event.type === 'motion'
+      )
 
     if (latestEvent) {
-      current = createIncident(latestEvent)
+      current =
+        createIncident(latestEvent)
     } else {
       const northGate: SightGridEvent = {
         id: `demo-north-${start}`,
@@ -118,17 +154,23 @@ export function SightGridDemo({
         deviceName: 'Camera 01',
         zoneId: 'north-gate',
         type: 'motion',
-        timestamp: new Date(start).toISOString(),
+        observationClass: 'person',
+        observationConfidence: 0.9,
+        timestamp: new Date(
+          start
+        ).toISOString(),
       }
 
-      current = createIncident(northGate)
+      current =
+        createIncident(northGate)
     }
 
     publishIncident(current)
 
-    const firstTimestamp = new Date(
-      current.events[0].timestamp
-    ).getTime()
+    const firstTimestamp =
+      new Date(
+        current.events[0].timestamp
+      ).getTime()
 
     const courtyard: SightGridEvent = {
       id: `demo-courtyard-${start}`,
@@ -137,6 +179,8 @@ export function SightGridDemo({
       deviceName: 'Camera 02',
       zoneId: 'courtyard',
       type: 'motion',
+      observationClass: 'person',
+      observationConfidence: 0.92,
       timestamp: new Date(
         firstTimestamp + 12_000
       ).toISOString(),
@@ -149,6 +193,8 @@ export function SightGridDemo({
       deviceName: 'Camera 03',
       zoneId: 'block-a',
       type: 'motion',
+      observationClass: 'person',
+      observationConfidence: 0.89,
       timestamp: new Date(
         firstTimestamp + 21_000
       ).toISOString(),
@@ -156,10 +202,11 @@ export function SightGridDemo({
 
     await wait(1200)
 
-    const second = addEventToIncident(
-      current,
-      courtyard
-    )
+    const second =
+      addEventToIncident(
+        current,
+        courtyard
+      )
 
     if (second) {
       current = second
@@ -168,18 +215,78 @@ export function SightGridDemo({
 
     await wait(1200)
 
-    const third = addEventToIncident(
-      current,
-      blockA
-    )
+    const third =
+      addEventToIncident(
+        current,
+        blockA
+      )
 
     if (third) {
       current = third
       publishIncident(current)
     }
 
+    /*
+     * Negative reasoning demonstration.
+     *
+     * This observation occurs almost immediately
+     * after Block A but at North Gate.
+     *
+     * Block A and North Gate are not directly
+     * adjacent, so SightGrid should reject it
+     * instead of blindly adding every event.
+     */
+    await wait(900)
+
+    const unrelatedEvent: SightGridEvent = {
+      id: `demo-rejected-${start}`,
+      source: 'simulated',
+      deviceId: 'camera-north-secondary',
+      deviceName: 'Camera 04',
+      zoneId: 'north-gate',
+      type: 'motion',
+      observationClass: 'person',
+      observationConfidence: 0.88,
+      timestamp: new Date(
+        firstTimestamp + 23_000
+      ).toISOString(),
+    }
+
+    const lastEvent =
+      current.events[
+        current.events.length - 1
+      ]
+
+    const rejectionResult =
+      evaluateCorrelation(
+        lastEvent,
+        unrelatedEvent
+      )
+
+    if (!rejectionResult.correlated) {
+      setRejectedObservation({
+        event: unrelatedEvent,
+        result: rejectionResult,
+      })
+    }
+
     setRunning(false)
   }
+
+  const confidencePercent =
+    incident &&
+    incident.correlationHistory.length > 0
+      ? Math.round(
+          incident.correlationConfidence *
+            100
+        )
+      : null
+
+  const latestCorrelation =
+    incident?.correlationHistory[
+      incident.correlationHistory.length -
+        1
+    ]
 
   return (
     <aside className="w-[370px] shrink-0 border-l border-slate-700 bg-dash-panel flex flex-col min-h-0">
@@ -244,7 +351,8 @@ export function SightGridDemo({
                 </span>
 
                 <span className="text-[10px] text-dash-cyan">
-                  {incident.events.length} observation
+                  {incident.events.length}{' '}
+                  observation
                   {incident.events.length !== 1
                     ? 's'
                     : ''}
@@ -256,6 +364,30 @@ export function SightGridDemo({
                   .map(zoneName)
                   .join(' → ')}
               </p>
+
+              {confidencePercent !==
+                null && (
+                <div className="mt-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] text-slate-500 uppercase tracking-wider">
+                      Correlation confidence
+                    </span>
+
+                    <span className="text-sm font-semibold text-cyan-300">
+                      {confidencePercent}%
+                    </span>
+                  </div>
+
+                  <div className="mt-2 h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                    <div
+                      className="h-full bg-cyan-400 transition-all duration-500"
+                      style={{
+                        width: `${confidencePercent}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="space-y-0">
@@ -266,7 +398,9 @@ export function SightGridDemo({
                       <div className="flex justify-between gap-3">
                         <div>
                           <p className="text-sm font-medium text-white">
-                            {zoneName(event.zoneId)}
+                            {zoneName(
+                              event.zoneId
+                            )}
                           </p>
 
                           <p className="text-[11px] text-slate-400 mt-1">
@@ -282,9 +416,27 @@ export function SightGridDemo({
                       </div>
 
                       <div className="flex items-center justify-between mt-3">
-                        <span className="text-[10px] text-dash-cyan uppercase tracking-wider">
-                          ● Motion observed
-                        </span>
+                        <div>
+                          <span className="text-[10px] text-dash-cyan uppercase tracking-wider">
+                            ●{' '}
+                            {event.observationClass ===
+                            'person'
+                              ? 'Person observed'
+                              : 'Motion observed'}
+                          </span>
+
+                          {event.observationConfidence !==
+                            undefined && (
+                            <p className="text-[9px] text-slate-500 mt-1">
+                              Semantic confidence:{' '}
+                              {Math.round(
+                                event.observationConfidence *
+                                  100
+                              )}
+                              %
+                            </p>
+                          )}
+                        </div>
 
                         <span
                           className={`text-[9px] uppercase ${sourceClass(
@@ -297,10 +449,12 @@ export function SightGridDemo({
                     </div>
 
                     {index <
-                      incident.events.length - 1 && (
+                      incident.events.length -
+                        1 && (
                       <div className="h-7 ml-6 border-l border-dashed border-cyan-800 flex items-center">
                         <span className="text-[9px] text-slate-500 ml-3">
-                          correlated by time + adjacency
+                          correlated by
+                          SightGrid
                         </span>
                       </div>
                     )}
@@ -309,18 +463,111 @@ export function SightGridDemo({
               )}
             </div>
 
-            {incident.events.length > 1 && (
+            {latestCorrelation && (
               <div className="mt-4 rounded-xl border border-cyan-900/60 bg-cyan-950/20 p-3">
-                <p className="text-[10px] uppercase tracking-wider text-dash-cyan">
-                  SightGrid Analysis
-                </p>
+                <div className="flex justify-between items-center">
+                  <p className="text-[10px] uppercase tracking-wider text-dash-cyan">
+                    Why correlated?
+                  </p>
 
-                <p className="text-xs text-slate-300 leading-5 mt-2">
-                  Activity was observed across
-                  physically adjacent zones within the
-                  correlation window. Human verification
-                  is recommended.
-                </p>
+                  <span className="text-[9px] text-green-400">
+                    CORRELATED
+                  </span>
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  {latestCorrelation.reasons.map(
+                    reason => (
+                      <div
+                        key={reason.label}
+                        className="flex gap-2"
+                      >
+                        <span
+                          className={
+                            reason.passed
+                              ? 'text-green-400'
+                              : 'text-red-400'
+                          }
+                        >
+                          {reason.passed
+                            ? '✓'
+                            : '×'}
+                        </span>
+
+                        <div>
+                          <p className="text-[10px] text-slate-300">
+                            {reason.label}
+                          </p>
+
+                          <p className="text-[9px] text-slate-500 leading-4">
+                            {reason.detail}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
+            )}
+
+            {rejectedObservation && (
+              <div className="mt-4 rounded-xl border border-red-900/60 bg-red-950/20 p-3">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-red-300">
+                      Observation Rejected
+                    </p>
+
+                    <p className="text-[9px] text-slate-500 mt-1">
+                      {
+                        rejectedObservation
+                          .event.deviceName
+                      }{' '}
+                      ·{' '}
+                      {zoneName(
+                        rejectedObservation
+                          .event.zoneId
+                      )}
+                    </p>
+                  </div>
+
+                  <span className="text-[9px] px-2 py-1 rounded border border-red-800 text-red-300">
+                    NOT CORRELATED
+                  </span>
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  {rejectedObservation.result.reasons.map(
+                    reason => (
+                      <div
+                        key={reason.label}
+                        className="flex gap-2"
+                      >
+                        <span
+                          className={
+                            reason.passed
+                              ? 'text-green-400'
+                              : 'text-red-400'
+                          }
+                        >
+                          {reason.passed
+                            ? '✓'
+                            : '×'}
+                        </span>
+
+                        <div>
+                          <p className="text-[10px] text-slate-300">
+                            {reason.label}
+                          </p>
+
+                          <p className="text-[9px] text-slate-500 leading-4">
+                            {reason.detail}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  )}
+                </div>
               </div>
             )}
           </>
@@ -335,33 +582,12 @@ export function SightGridDemo({
             </span>
 
             <span className="text-[10px] text-slate-500">
-              {normalizedRingEvents.length} received
+              {
+                normalizedRingEvents.length
+              }{' '}
+              received
             </span>
           </div>
-
-          {normalizedRingEvents[0] && (
-            <div className="mt-2 flex items-center justify-between rounded-lg border border-slate-700 px-2.5 py-2">
-              <div>
-                <p className="text-[11px] text-white">
-                  {normalizedRingEvents[0].type}
-                </p>
-
-                <p className="text-[9px] text-slate-500 mt-0.5">
-                  {normalizedRingEvents[0].deviceName}
-                </p>
-              </div>
-
-              <span
-                className={`text-[9px] ${sourceClass(
-                  normalizedRingEvents[0]
-                )}`}
-              >
-                {sourceLabel(
-                  normalizedRingEvents[0]
-                )}
-              </span>
-            </div>
-          )}
         </div>
 
         <button
@@ -370,14 +596,16 @@ export function SightGridDemo({
           className="w-full bg-dash-cyan text-slate-950 font-semibold text-sm py-2.5 rounded-lg hover:bg-cyan-300 transition disabled:opacity-50"
         >
           {running
-            ? 'Correlating observations...'
-            : normalizedRingEvents.length > 0
+            ? 'Evaluating observations...'
+            : normalizedRingEvents.length >
+                0
               ? 'Continue Across Site'
-              : 'Run Cross-Camera Scenario'}
+              : 'Run Intelligent Scenario'}
         </button>
 
         <p className="text-[9px] text-center text-slate-600 mt-2">
-          Additional demo devices are explicitly simulated.
+          Additional demo observations are
+          explicitly simulated.
         </p>
       </div>
     </aside>
