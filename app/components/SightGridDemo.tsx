@@ -28,7 +28,10 @@ export function SightGridDemo({
 
   const normalizedRingEvents = ringEvents
     .map(normalizeRingEvent)
-    .filter((event): event is SightGridEvent => event !== null)
+    .filter(
+      (event): event is SightGridEvent =>
+        event !== null
+    )
 
   const zoneName = (zoneId: string) => {
     const names: Record<string, string> = {
@@ -41,123 +44,16 @@ export function SightGridDemo({
     return names[zoneId] ?? zoneId
   }
 
-  /*
-   * When a Ring/test webhook arrives, make it the beginning
-   * of a SightGrid incident.
-   */
-  useEffect(() => {
-    const latestEvent = normalizedRingEvents[0]
-
-    if (!latestEvent) return
-
-    if (processedEventIds.current.has(latestEvent.id)) {
-      return
-    }
-
-    processedEventIds.current.add(latestEvent.id)
-
-    setIncident(createIncident(latestEvent))
-  }, [ringEvents])
-
-  /*
-   * Demonstrates additional cameras observing activity after
-   * the first event.
-   *
-   * If a webhook event already exists, it becomes observation #1.
-   * Otherwise we create a completely simulated North Gate event.
-   */
-  const runDemo = async () => {
-    if (running) return
-
-    setRunning(true)
-
-    const start = Date.now()
-
-    let current: SightGridIncident
-
-    const latestRingEvent = normalizedRingEvents[0]
-
-    if (latestRingEvent) {
-      current = createIncident(latestRingEvent)
-    } else {
-      const northGateEvent: SightGridEvent = {
-        id: `demo-north-${start}`,
-        source: 'simulated',
-        deviceId: 'camera-north',
-        deviceName: 'Camera 01',
-        zoneId: 'north-gate',
-        type: 'motion',
-        timestamp: new Date(start).toISOString(),
-      }
-
-      current = createIncident(northGateEvent)
-    }
-
-    setIncident(current)
-
-    /*
-     * Use timestamps relative to the first observation so the
-     * correlation engine evaluates the sequence as one incident.
-     */
-    const firstTimestamp =
-      new Date(current.events[0].timestamp).getTime()
-
-    const courtyardEvent: SightGridEvent = {
-      id: `demo-courtyard-${start}`,
-      source: 'simulated',
-      deviceId: 'camera-courtyard',
-      deviceName: 'Camera 02',
-      zoneId: 'courtyard',
-      type: 'motion',
-      timestamp: new Date(firstTimestamp + 12_000).toISOString(),
-    }
-
-    const blockAEvent: SightGridEvent = {
-      id: `demo-block-a-${start}`,
-      source: 'simulated',
-      deviceId: 'camera-block-a',
-      deviceName: 'Camera 03',
-      zoneId: 'block-a',
-      type: 'motion',
-      timestamp: new Date(firstTimestamp + 21_000).toISOString(),
-    }
-
-    await wait(1200)
-
-    const second =
-      addEventToIncident(current, courtyardEvent)
-
-    if (second) {
-      current = second
-      setIncident(current)
-    }
-
-    await wait(1200)
-
-    const third =
-      addEventToIncident(current, blockAEvent)
-
-    if (third) {
-      current = third
-      setIncident(current)
-    }
-
-    setRunning(false)
-  }
-
   const sourceLabel = (event: SightGridEvent) => {
     if (event.source === 'ring') {
       return 'REAL RING'
     }
 
-    const simulatedWebhook =
-      event.metadata?.simulated === true
-
-    if (simulatedWebhook) {
+    if (event.metadata?.simulated === true) {
       return 'SIMULATED WEBHOOK'
     }
 
-    return 'SIMULATED CAMERA'
+    return 'SIMULATED DEVICE'
   }
 
   const sourceClass = (event: SightGridEvent) => {
@@ -168,219 +64,306 @@ export function SightGridDemo({
     return 'text-amber-400'
   }
 
+  useEffect(() => {
+    const latestEvent = normalizedRingEvents[0]
+
+    if (!latestEvent) return
+
+    if (
+      processedEventIds.current.has(latestEvent.id)
+    ) {
+      return
+    }
+
+    processedEventIds.current.add(latestEvent.id)
+    setIncident(createIncident(latestEvent))
+  }, [ringEvents])
+
+  const runDemo = async () => {
+    if (running) return
+
+    setRunning(true)
+
+    const start = Date.now()
+
+    let current: SightGridIncident
+
+    const latestEvent = normalizedRingEvents.find(
+      event => event.type === 'motion'
+    )
+
+    if (latestEvent) {
+      current = createIncident(latestEvent)
+    } else {
+      const northGate: SightGridEvent = {
+        id: `demo-north-${start}`,
+        source: 'simulated',
+        deviceId: 'camera-north',
+        deviceName: 'Camera 01',
+        zoneId: 'north-gate',
+        type: 'motion',
+        timestamp: new Date(start).toISOString(),
+      }
+
+      current = createIncident(northGate)
+    }
+
+    setIncident(current)
+
+    const firstTimestamp = new Date(
+      current.events[0].timestamp
+    ).getTime()
+
+    const courtyard: SightGridEvent = {
+      id: `demo-courtyard-${start}`,
+      source: 'simulated',
+      deviceId: 'camera-courtyard',
+      deviceName: 'Camera 02',
+      zoneId: 'courtyard',
+      type: 'motion',
+      timestamp: new Date(
+        firstTimestamp + 12_000
+      ).toISOString(),
+    }
+
+    const blockA: SightGridEvent = {
+      id: `demo-block-a-${start}`,
+      source: 'simulated',
+      deviceId: 'camera-block-a',
+      deviceName: 'Camera 03',
+      zoneId: 'block-a',
+      type: 'motion',
+      timestamp: new Date(
+        firstTimestamp + 21_000
+      ).toISOString(),
+    }
+
+    await wait(1200)
+
+    const second = addEventToIncident(
+      current,
+      courtyard
+    )
+
+    if (second) {
+      current = second
+      setIncident(current)
+    }
+
+    await wait(1200)
+
+    const third = addEventToIncident(
+      current,
+      blockA
+    )
+
+    if (third) {
+      current = third
+      setIncident(current)
+    }
+
+    setRunning(false)
+  }
+
   return (
-    <div className="w-[380px] border-l border-slate-700 bg-dash-panel p-4 overflow-y-auto">
+    <aside className="w-[370px] shrink-0 border-l border-slate-700 bg-dash-panel flex flex-col min-h-0">
+      <div className="p-4 border-b border-slate-700">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-dash-cyan">
+              Incident Intelligence
+            </p>
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <p className="text-xs uppercase tracking-widest text-dash-cyan">
-            SightGrid
-          </p>
-
-          <h2 className="text-lg font-bold text-white">
-            Incident Correlation
-          </h2>
-        </div>
-
-        <span className="text-[10px] px-2 py-1 rounded bg-slate-700 text-slate-300">
-          DEMO
-        </span>
-      </div>
-
-      {/* Webhook feed */}
-      <div className="mb-4 rounded-lg border border-slate-700 bg-dash-card p-3">
-
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-white">
-            Ring Event Feed
-          </span>
-
-          <span className="rounded bg-slate-700 px-2 py-1 text-[10px] text-slate-300">
-            WEBHOOK FEED
-          </span>
-        </div>
-
-        {normalizedRingEvents.length === 0 ? (
-          <p className="mt-2 text-xs text-slate-400">
-            Waiting for Ring webhook events...
-          </p>
-        ) : (
-          <div className="mt-3 space-y-2">
-
-            {normalizedRingEvents
-              .slice(0, 3)
-              .map(event => (
-                <div
-                  key={event.id}
-                  className="rounded border border-slate-700 p-2"
-                >
-                  <div className="flex justify-between">
-
-                    <span className="text-xs text-dash-cyan">
-                      {event.type}
-                    </span>
-
-                    <span className="text-[10px] text-slate-500">
-                      {new Date(
-                        event.timestamp
-                      ).toLocaleTimeString()}
-                    </span>
-
-                  </div>
-
-                  <p className="mt-1 text-xs text-slate-400">
-                    {event.deviceName}
-                  </p>
-
-                  <p
-                    className={`mt-1 text-[10px] uppercase ${sourceClass(
-                      event
-                    )}`}
-                  >
-                    {sourceLabel(event)}
-                  </p>
-
-                </div>
-              ))}
-
+            <h2 className="text-lg font-semibold text-white mt-1">
+              Active Incident
+            </h2>
           </div>
-        )}
 
-      </div>
-
-      {/* Demo action */}
-      <button
-        onClick={runDemo}
-        disabled={running}
-        className="w-full bg-dash-cyan text-black font-bold py-2 rounded-lg hover:bg-cyan-300 disabled:opacity-50"
-      >
-        {running
-          ? 'Correlating Events...'
-          : normalizedRingEvents.length > 0
-            ? 'Continue Across Site'
-            : 'Run Demo Incident'}
-      </button>
-
-      {!incident && (
-        <div className="mt-6 border border-dashed border-slate-600 rounded-lg p-5 text-center">
-
-          <p className="text-sm text-slate-400">
-            No active incident
-          </p>
-
-          <p className="text-xs text-slate-500 mt-1">
-            Generate a webhook event or run the demo to begin.
-          </p>
-
-        </div>
-      )}
-
-      {incident && (
-        <div className="mt-5">
-
-          {/* Incident status */}
-          <div className="flex items-center justify-between">
-
-            <span className="text-xs text-slate-400">
-              ACTIVE INCIDENT
-            </span>
-
+          {incident ? (
             <span
-              className={`text-[10px] px-2 py-1 rounded ${
-                incident.status === 'requires_verification'
-                  ? 'bg-amber-900 text-amber-300'
-                  : 'bg-blue-900 text-blue-300'
+              className={`text-[9px] px-2 py-1 rounded-full ${
+                incident.status ===
+                'requires_verification'
+                  ? 'bg-amber-950 text-amber-300 border border-amber-800'
+                  : 'bg-blue-950 text-blue-300 border border-blue-800'
               }`}
             >
               {incident.status
                 .replaceAll('_', ' ')
                 .toUpperCase()}
             </span>
+          ) : (
+            <span className="text-[9px] px-2 py-1 rounded-full border border-slate-600 text-slate-400">
+              IDLE
+            </span>
+          )}
+        </div>
+      </div>
 
-          </div>
-
-          {/* Incident timeline */}
-          <div className="mt-4 space-y-1">
-
-            {incident.events.map((event, index) => (
-              <div key={event.id}>
-
-                <div className="bg-dash-card rounded-lg p-3">
-
-                  <div className="flex justify-between">
-
-                    <span className="text-sm font-medium text-white">
-                      {zoneName(event.zoneId)}
-                    </span>
-
-                    <span className="text-xs text-slate-400">
-                      {new Date(
-                        event.timestamp
-                      ).toLocaleTimeString()}
-                    </span>
-
-                  </div>
-
-                  <div className="flex justify-between mt-1">
-
-                    <span className="text-xs text-slate-400">
-                      {event.deviceName}
-                    </span>
-
-                    <span
-                      className={`text-[10px] uppercase ${sourceClass(
-                        event
-                      )}`}
-                    >
-                      {sourceLabel(event)}
-                    </span>
-
-                  </div>
-
-                  <p className="text-xs text-dash-cyan mt-2">
-                    Motion observed
-                  </p>
-
-                </div>
-
-                {index <
-                  incident.events.length - 1 && (
-                  <div className="text-center text-slate-500 py-1">
-                    ↓
-                  </div>
-                )}
-
+      <div className="flex-1 overflow-y-auto p-4">
+        {!incident ? (
+          <div className="h-full min-h-[250px] flex items-center justify-center">
+            <div className="text-center max-w-[240px]">
+              <div className="w-12 h-12 mx-auto rounded-full border border-slate-700 flex items-center justify-center text-slate-500 text-xl">
+                ◇
               </div>
-            ))}
 
-          </div>
-
-          {/* Correlation explanation */}
-          {incident.events.length > 1 && (
-            <div className="mt-4 border border-dash-cyan/30 bg-cyan-950/20 rounded-lg p-3">
-
-              <p className="text-xs text-dash-cyan font-medium">
-                CORRELATED SEQUENCE
+              <p className="text-sm text-slate-300 mt-3">
+                No active incident
               </p>
+
+              <p className="text-xs text-slate-500 mt-1 leading-5">
+                SightGrid is monitoring device
+                observations for spatially related
+                activity.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="rounded-xl border border-slate-700 bg-slate-900/40 p-3 mb-4">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] uppercase tracking-wider text-slate-500">
+                  Correlation
+                </span>
+
+                <span className="text-[10px] text-dash-cyan">
+                  {incident.events.length} observation
+                  {incident.events.length !== 1
+                    ? 's'
+                    : ''}
+                </span>
+              </div>
 
               <p className="text-sm text-white mt-2">
                 {incident.path
                   .map(zoneName)
                   .join(' → ')}
               </p>
+            </div>
 
-              <p className="text-xs text-slate-400 mt-2">
-                {incident.events.length} observations correlated
-                using time and spatial adjacency.
-              </p>
+            <div className="space-y-0">
+              {incident.events.map(
+                (event, index) => (
+                  <div key={event.id}>
+                    <div className="relative rounded-xl border border-slate-700 bg-dash-card p-3">
+                      <div className="flex justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium text-white">
+                            {zoneName(event.zoneId)}
+                          </p>
 
+                          <p className="text-[11px] text-slate-400 mt-1">
+                            {event.deviceName}
+                          </p>
+                        </div>
+
+                        <span className="text-[10px] text-slate-500 whitespace-nowrap">
+                          {new Date(
+                            event.timestamp
+                          ).toLocaleTimeString()}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between mt-3">
+                        <span className="text-[10px] text-dash-cyan uppercase tracking-wider">
+                          ● Motion observed
+                        </span>
+
+                        <span
+                          className={`text-[9px] uppercase ${sourceClass(
+                            event
+                          )}`}
+                        >
+                          {sourceLabel(event)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {index <
+                      incident.events.length - 1 && (
+                      <div className="h-7 ml-6 border-l border-dashed border-cyan-800 flex items-center">
+                        <span className="text-[9px] text-slate-500 ml-3">
+                          correlated by time + adjacency
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )
+              )}
+            </div>
+
+            {incident.events.length > 1 && (
+              <div className="mt-4 rounded-xl border border-cyan-900/60 bg-cyan-950/20 p-3">
+                <p className="text-[10px] uppercase tracking-wider text-dash-cyan">
+                  SightGrid Analysis
+                </p>
+
+                <p className="text-xs text-slate-300 leading-5 mt-2">
+                  Activity was observed across
+                  physically adjacent zones within the
+                  correlation window. Human verification
+                  is recommended.
+                </p>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      <div className="p-4 border-t border-slate-700">
+        <div className="mb-3">
+          <div className="flex justify-between">
+            <span className="text-[10px] uppercase tracking-wider text-slate-500">
+              Event Input
+            </span>
+
+            <span className="text-[10px] text-slate-500">
+              {normalizedRingEvents.length} received
+            </span>
+          </div>
+
+          {normalizedRingEvents[0] && (
+            <div className="mt-2 flex items-center justify-between rounded-lg border border-slate-700 px-2.5 py-2">
+              <div>
+                <p className="text-[11px] text-white">
+                  {normalizedRingEvents[0].type}
+                </p>
+
+                <p className="text-[9px] text-slate-500 mt-0.5">
+                  {normalizedRingEvents[0].deviceName}
+                </p>
+              </div>
+
+              <span
+                className={`text-[9px] ${sourceClass(
+                  normalizedRingEvents[0]
+                )}`}
+              >
+                {sourceLabel(
+                  normalizedRingEvents[0]
+                )}
+              </span>
             </div>
           )}
-
         </div>
-      )}
 
-    </div>
+        <button
+          onClick={runDemo}
+          disabled={running}
+          className="w-full bg-dash-cyan text-slate-950 font-semibold text-sm py-2.5 rounded-lg hover:bg-cyan-300 transition disabled:opacity-50"
+        >
+          {running
+            ? 'Correlating observations...'
+            : normalizedRingEvents.length > 0
+              ? 'Continue Across Site'
+              : 'Run Cross-Camera Scenario'}
+        </button>
+
+        <p className="text-[9px] text-center text-slate-600 mt-2">
+          Additional demo devices are explicitly simulated.
+        </p>
+      </div>
+    </aside>
   )
 }

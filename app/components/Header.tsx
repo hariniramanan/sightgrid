@@ -6,32 +6,67 @@ interface HeaderProps {
   simpleMode?: boolean
 }
 
-export function Header({ connected, enabledCount, simpleMode }: HeaderProps) {
+export function Header({
+  connected,
+  enabledCount,
+  simpleMode,
+}: HeaderProps) {
   return (
-    <header className="bg-dash-panel border-b border-slate-700 px-4 py-2 flex items-center justify-between shrink-0">
+    <header className="h-[68px] bg-dash-panel border-b border-slate-700 px-5 flex items-center justify-between shrink-0">
       <div className="flex items-center gap-3">
-        <span className="text-xl">◈</span>
+        <div className="w-9 h-9 rounded-lg border border-cyan-500/30 bg-cyan-950/30 flex items-center justify-center text-dash-cyan text-xl">
+          ◈
+        </div>
+
         <div>
-          <h1 className="text-lg font-bold text-white">SightGrid</h1>
-          <p className="text-[10px] text-slate-400 tracking-wider uppercase">
-          Spatial Event Intelligence
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-bold text-white tracking-wide">
+              SightGrid
+            </h1>
+
+            <span className="text-[9px] px-2 py-0.5 rounded-full border border-cyan-700/50 bg-cyan-950/30 text-cyan-300 uppercase tracking-wider">
+              Prototype
+            </span>
+          </div>
+
+          <p className="text-[10px] text-slate-400 tracking-[0.18em] uppercase">
+            Spatial Event Intelligence
           </p>
         </div>
-        <span className="text-xl">📡</span>
-        <h1 className="text-lg font-bold text-white">Live Detection Dashboard</h1>
       </div>
-      {!simpleMode && (
-        <div className="flex items-center gap-3">
-          <span className={`text-xs px-2 py-1 rounded-full ${connected ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
-            {connected ? '● Connected' : '○ Disconnected'}
-          </span>
-          {enabledCount > 0 && (
-            <span className="text-xs px-2 py-1 rounded-full bg-purple-900 text-purple-300">
-              {enabledCount} processor{enabledCount > 1 ? 's' : ''} active
+
+      <div className="flex items-center gap-3">
+        {simpleMode ? (
+          <>
+            <span className="hidden sm:inline text-[10px] text-slate-500 uppercase tracking-wider">
+              Ring Playground
             </span>
-          )}
-        </div>
-      )}
+
+            <span className="text-[10px] px-2.5 py-1 rounded-full bg-green-950/60 border border-green-800/60 text-green-300">
+              ● RING API CONNECTED
+            </span>
+          </>
+        ) : (
+          <>
+            <span
+              className={`text-xs px-2 py-1 rounded-full ${
+                connected
+                  ? 'bg-green-900 text-green-300'
+                  : 'bg-red-900 text-red-300'
+              }`}
+            >
+              {connected ? '● Connected' : '○ Disconnected'}
+            </span>
+
+            {enabledCount > 0 && (
+              <span className="text-xs px-2 py-1 rounded-full bg-purple-900 text-purple-300">
+                {enabledCount} processor
+                {enabledCount > 1 ? 's' : ''} active
+              </span>
+            )}
+          </>
+        )}
+      </div>
     </header>
   )
 }
