@@ -129,9 +129,9 @@ export function SightGridDemo({
             Ring Event Feed
           </span>
 
-          <span className="rounded bg-green-900 px-2 py-1 text-[10px] text-green-300">
-            REAL RING
-          </span>
+        <span className="rounded bg-slate-700 px-2 py-1 text-[10px] text-slate-300">
+            WEBHOOK FEED
+        </span>
         </div>
 
         {normalizedRingEvents.length === 0 ? (
@@ -159,8 +159,16 @@ export function SightGridDemo({
                   {event.deviceName}
                 </p>
 
-                <p className="mt-1 text-[10px] uppercase text-green-400">
-                  Ring webhook
+                <p
+                    className={`mt-1 text-[10px] uppercase ${
+                        event.source === 'ring'
+                            ? 'text-green-400'
+                            : 'text-amber-400'
+                    }`}
+                >
+                    {event.source === 'ring'
+                        ? 'REAL RING'
+                        : 'SIMULATED WEBHOOK'}
                 </p>
               </div>
             ))}
