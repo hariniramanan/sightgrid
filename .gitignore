@@ -32,3 +32,12 @@ dist/
 # Misc
 *.log
 *.tsbuildinfo
+
+# Local development backups
+app/components/SightGridDemo.tsx.pre-product-ui
+app/page.tsx.build2-backup
+app/page.tsx.pre-product-ui
+lib/types.ts
+
+# Local Kiro workspace settings
+.kiro/
